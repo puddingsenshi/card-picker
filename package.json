@@ -7,13 +7,15 @@
   "exports": {
     ".": "./src/index.ts",
     "./style.css": "./src/fan-layout.css",
-    "./pointer": "./src/pointer/index.ts"
+    "./pointer": "./src/pointer/index.ts",
+    "./hand": "./src/hand/index.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
     "test": "bun test"
   },
   "devDependencies": {
+    "@mediapipe/tasks-vision": "^1.0.1",
     "@mystic-tarot/config": "workspace:*",
     "@types/bun": "^1.3.14",
     "@types/react": "catalog:",
@@ -21,6 +23,12 @@
     "typescript": "catalog:"
   },
   "peerDependencies": {
+    "@mediapipe/tasks-vision": "*",
     "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "@mediapipe/tasks-vision": {
+      "optional": true
+    }
   }
 }
