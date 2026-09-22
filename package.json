@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./style.css": "./src/fan-layout.css"
+    "./style.css": "./src/fan-layout.css",
+    "./pointer": "./src/pointer/index.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
