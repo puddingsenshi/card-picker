@@ -1,0 +1,112 @@
+/*
+ * card-picker 的版面樣式。刻意寫成純 CSS——不依賴 Tailwind 或任何設計系統，
+ * 這個 package 才能被任何前端專案直接拿去用。
+ *
+ * 所有數值都來自 `fanStyle()` 注入的 CSS 變數；這裡只負責「怎麼排」，不決定大小。
+ */
+
+.cp-fan {
+  /*
+   * 宣告成 container，讓卡寬能寫成「容器寬 ÷ 扇形寬倍數」。
+   *
+   * 高度必須設在**子元素** .cp-fan-stage 上，不能設在這裡：
+   * container query 單位在 container 元素自身的屬性上求值時，參照的是更外層的
+   * container（規範為了避免循環相依而這樣定義）。設在這裡會量到錯的東西。
+   */
+  container-type: inline-size;
+  width: 100%;
+}
+
+.cp-fan-stage {
+  position: relative;
+  height: var(--cp-fan-h);
+  margin-inline: auto;
+}
+
+/*
+ * 定位層：只負責把每張卡的原點放到正中央，本身**不旋轉**。
+ *
+ * pointer-events: none 是關鍵。這層沒有被旋轉，所以每一張的定位框都疊在正中央；
+ * 若它照常接收滑鼠事件，上層那幾張的定位框會把中間的卡整片蓋住——
+ * 看得到卻永遠點不到。事件交還給裡面已旋轉、形狀與視覺一致的那層。
+ */
+.cp-slot {
+  position: absolute;
+  top: var(--cp-lift);
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: var(--cp-z);
+}
+
+/*
+ * 疊放順序固定依卡序，hover **不改變它**：指上去時卡只是被推出，
+ * 仍維持被鄰卡壓住的樣子，像用手指把實體牌從牌堆裡推出來，而不是整張跳到最前面。
+ *
+ * 這不會造成「看到這張、點到那張」——hover 判定與點擊命中用的是同一套堆疊順序。
+ */
+.cp-slot[data-selected="true"] {
+  z-index: 900;
+}
+
+/*
+ * focus-visible 仍要提到最上層：鍵盤使用者沒有游標指示位置，
+ * 焦點落在幾乎被蓋住的卡上會完全看不出來。
+ */
+.cp-slot:has(.cp-card:focus-visible) {
+  z-index: 1000;
+}
+
+/*
+ * 旋轉層。樞紐放在卡面下方很遠處，卡才會像實體牌以手腕為圓心攤開；
+ * 以中心為軸只會變成一堆各自轉動的方塊。
+ *
+ * 平移與旋轉一定要分兩層：寫在同一個 transform 裡，平移會把旋轉圓心一起帶走，
+ * 整個扇形就歪掉。
+ */
+.cp-rotor {
+  display: block;
+  pointer-events: auto;
+  transform-origin: 50% var(--cp-pivot);
+  transform: rotate(var(--cp-angle));
+}
+
+.cp-card {
+  display: block;
+  width: var(--cp-card-w);
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  transition: transform 300ms ease;
+}
+
+.cp-card:disabled {
+  cursor: default;
+}
+
+.cp-card:focus-visible {
+  outline: none;
+}
+
+/* 只位移、不改變疊放——見上面 .cp-slot 的說明。 */
+.cp-card:not(:disabled):hover,
+.cp-card:focus-visible,
+.cp-card[data-active="true"] {
+  transform: translateY(calc(-1 * var(--cp-lift)));
+}
+
+.cp-card[aria-pressed="true"] {
+  transform: translateY(calc(-1.5 * var(--cp-lift)));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-card {
+    transition: none;
+  }
+}
