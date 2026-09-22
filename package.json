@@ -1,26 +1,56 @@
 {
-  "name": "card-picker",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@puddingsenshi/card-picker",
+  "version": "0.1.0",
   "description": "扇形／線性排列的選卡互動元件。與任何牌組領域無關。",
+  "keywords": [
+    "react",
+    "card",
+    "fan-layout",
+    "picker",
+    "gesture",
+    "mediapipe"
+  ],
+  "license": "MIT",
+  "author": "puddingsenshi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/puddingsenshi/card-picker.git"
+  },
   "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "files": [
+    "dist"
+  ],
   "exports": {
-    ".": "./src/index.ts",
-    "./style.css": "./src/fan-layout.css",
-    "./pointer": "./src/pointer/index.ts",
-    "./hand": "./src/hand/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./style.css": "./dist/fan-layout.css",
+    "./pointer": {
+      "types": "./dist/pointer/index.d.ts",
+      "import": "./dist/pointer/index.js"
+    },
+    "./hand": {
+      "types": "./dist/hand/index.d.ts",
+      "import": "./dist/hand/index.js"
+    }
   },
   "scripts": {
+    "build": "tsup && cp src/fan-layout.css dist/fan-layout.css",
     "check-types": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "prepublishOnly": "bun run build"
   },
   "devDependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
-    "@mystic-tarot/config": "workspace:*",
     "@types/bun": "^1.3.14",
-    "@types/react": "catalog:",
-    "react": "catalog:",
-    "typescript": "catalog:"
+    "@types/react": "^19.2.15",
+    "react": "^19.2.6",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2"
   },
   "peerDependencies": {
     "@mediapipe/tasks-vision": "*",

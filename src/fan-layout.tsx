@@ -39,7 +39,7 @@ export interface FanLayoutProps {
  * 扇形排列。
  *
  * 只決定「怎麼排、指到哪張、選了哪些」，不知道卡片是什麼、也不知道選完要做什麼。
- * 樣式在 `card-picker/style.css`，呼叫端需自行 import 一次。
+ * 樣式在 `@puddingsenshi/card-picker/style.css`，呼叫端需自行 import 一次。
  */
 export function FanLayout({
   count,
