@@ -19,7 +19,9 @@ bun add github:puddingsenshi/card-picker
 # 或 npm install github:puddingsenshi/card-picker
 ```
 
-`dist/` 不進版控，所以從 git 安裝時靠 `prepare` 在安裝端自己 build 一次。
+`dist/` 有進版控。這不是偷懶——bun 安裝 git 相依時不會裝它的 devDependencies，
+所以 `tsup` 不存在，靠 `prepare` 在安裝端 build 這條路走不通。改動 `src/` 之後
+記得跑一次 `bun run build` 再 commit。
 
 需要 React 18 以上。手勢功能另外需要 `@mediapipe/tasks-vision`，不裝也能用其餘功能。
 

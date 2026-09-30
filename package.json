@@ -42,8 +42,7 @@
     "build": "tsup && cp src/fan-layout.css dist/fan-layout.css",
     "check-types": "tsc --noEmit",
     "test": "bun test",
-    "prepublishOnly": "bun run build",
-    "prepare": "bun run build"
+    "prepublishOnly": "bun run build"
   },
   "devDependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",

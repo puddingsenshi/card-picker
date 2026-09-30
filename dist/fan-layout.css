@@ -1,0 +1,303 @@
+/*
+ * card-picker 的版面樣式。刻意寫成純 CSS——不依賴 Tailwind 或任何設計系統，
+ * 這個 package 才能被任何前端專案直接拿去用。
+ *
+ * 所有數值都來自 `fanStyle()` 注入的 CSS 變數；這裡只負責「怎麼排」，不決定大小。
+ */
+
+.cp-fan {
+  /*
+   * 宣告成 container，讓卡寬能寫成「容器寬 ÷ 扇形寬倍數」。
+   *
+   * 高度必須設在**子元素** .cp-fan-stage 上，不能設在這裡：
+   * container query 單位在 container 元素自身的屬性上求值時，參照的是更外層的
+   * container（規範為了避免循環相依而這樣定義）。設在這裡會量到錯的東西。
+   */
+  container-type: inline-size;
+  width: 100%;
+}
+
+.cp-fan-stage {
+  position: relative;
+  height: var(--cp-fan-h);
+  margin-inline: auto;
+}
+
+/*
+ * 定位層：只負責把每張卡的原點放到正中央，本身**不旋轉**。
+ *
+ * pointer-events: none 是關鍵。這層沒有被旋轉，所以每一張的定位框都疊在正中央；
+ * 若它照常接收滑鼠事件，上層那幾張的定位框會把中間的卡整片蓋住——
+ * 看得到卻永遠點不到。事件交還給裡面已旋轉、形狀與視覺一致的那層。
+ */
+.cp-slot {
+  position: absolute;
+  top: var(--cp-headroom);
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: var(--cp-z);
+  transition: transform 300ms ease;
+}
+
+/*
+ * 疊放順序固定依卡序，hover 與選取都**不改變它**。
+ *
+ * 指上去時卡只是被推出，仍維持被鄰卡壓住的樣子，像用手指把實體牌從牌堆裡
+ * 推出來，而不是整張跳到最前面；選走一張也一樣，它還是牌組裡的第 n 張，
+ * 該被壓住就被壓住。把選中的卡提到最上層等於把它從牌堆裡抽出來——
+ * 選中與未選中的差別交給卡面自己表現，位置、圖層都不動。
+ *
+ * 這不會造成「看到這張、點到那張」——hover 判定與點擊命中用的是同一套堆疊順序。
+ */
+
+/*
+ * focus-visible 仍要提到最上層：鍵盤使用者沒有游標指示位置，
+ * 焦點落在幾乎被蓋住的卡上會完全看不出來。
+ */
+.cp-slot:has(.cp-card:focus-visible) {
+  z-index: 1000;
+}
+
+/*
+ * 旋轉層。樞紐放在卡面下方很遠處，卡才會像實體牌以手腕為圓心攤開；
+ * 以中心為軸只會變成一堆各自轉動的方塊。
+ *
+ * 平移與旋轉一定要分兩層：寫在同一個 transform 裡，平移會把旋轉圓心一起帶走，
+ * 整個扇形就歪掉。
+ */
+.cp-rotor {
+  display: block;
+  pointer-events: auto;
+  transform-origin: 50% var(--cp-pivot);
+  transform: rotate(var(--cp-angle));
+}
+
+.cp-card {
+  display: block;
+  width: var(--cp-card-w);
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  /* 位移由 .cp-slot 負責，這裡只過渡卡面自己的變化。 */
+  transition: opacity 300ms ease;
+}
+
+.cp-card:disabled {
+  cursor: default;
+}
+
+.cp-card:focus-visible {
+  outline: none;
+}
+
+/*
+ * 推出的位移掛在 .cp-slot，不是 .cp-card。
+ *
+ * .cp-rotor 已經把卡轉過了，寫在它裡面的 translateY 會沿著**卡片自己的上方**跑，
+ * 不是螢幕的上方：中間那張（0°）筆直升 32px，兩端那張（±34°）只升 26px、
+ * 還橫向飄 18px。同一個數值，越靠邊看起來越像斜著滑出牌組。
+ *
+ * .cp-slot 沒有被旋轉，位移掛在這裡才是真正的「往上推一點點」，
+ * 每張卡升一樣高、不左右偏。translateX(-50%) 是它原本的置中，要一起帶著。
+ */
+.cp-slot:has(.cp-card:not(:disabled):hover),
+.cp-slot:has(.cp-card:focus-visible),
+.cp-slot:has(.cp-card[data-active="true"]) {
+  transform: translateX(-50%) translateY(calc(-1 * var(--cp-lift)));
+}
+
+/*
+ * 選中的卡停在「滑鼠滑過時」的那個高度，移開也不退回去。
+ *
+ * 除了停住，其餘什麼都不變——角度不變、圖層不變（見上面 .cp-slot 的說明）、
+ * 鄰卡不淡化。它仍然是牌組裡的第 n 張，該被鄰卡壓住就被壓住。
+ * 選中與未選中的差別交給卡面自己表現（呼叫端畫的框、底色之類）。
+ *
+ * 角度不動的另一個理由：轉正會讓多張選中的卡全部疊到正中央。
+ */
+.cp-slot:has(.cp-card[aria-pressed="true"]) {
+  transform: translateX(-50%) translateY(calc(-1 * var(--cp-selected-lift)));
+  /*
+   * **刻意不寫 z-index。**
+   *
+   * 提到上層會讓它整張浮在牌組前面，看起來像被抽走了；維持原本的疊放順序，
+   * 它才還是牌組裡的第 n 張——右邊那張照常壓住它的一角，跟未選的牌一樣。
+   * 代價是卡面的選取標記（框、底色）右半邊會被蓋掉一部分，這是要的效果。
+   */
+}
+
+/*
+ * 選了牌之後，沒選的往後退一步。
+ *
+ * 位移能把卡拉出牌堆，但拉不開它左右的鄰居；靠對比讓牌堆整個沉下去，
+ * 選中的那幾張才真的「浮」出來。
+ */
+.cp-fan[data-has-selection="true"] .cp-card:not([aria-pressed="true"]) {
+  opacity: var(--cp-dim);
+}
+
+/*
+ * 發牌：從一疊牌變成一把扇形。四段節奏接成一條時間軸——
+ *
+ *   0 ──── enter ──── hold ──── shuffle ──── stagger 串接 + spread ──→ 可點
+ *          整疊浮現    停一拍     洗牌          依序攤開
+ *
+ * 動畫掛在不同的層。同一個元素上兩個 animation 只要改的是**同一個屬性**就會互相
+ * 蓋掉（後宣告的整段勝出，不會疊加），改不同屬性則各走各的：
+ *
+ *   .cp-slot  整疊浮現（transform / opacity）＋ 切牌換層（z-index）
+ *   .cp-card  切牌的位移：上半疊被拿起來、移開、放回去
+ *   .cp-rotor 依序攤開：每張延後一點才轉到自己的角度
+ *
+ * .cp-slot 上兩個 animation 共存沒問題——一個動 transform、一個動 z-index。
+ * .cp-card（按鈕本身）之所以能拿來洗牌，是因為推出與選取的位移都已經搬到
+ * .cp-slot 了，這一層的 transform 是空的。洗牌期間 .cp-rotor 還停在牌堆角度，
+ * 幾乎沒有旋轉，所以這裡的左右位移就是螢幕的左右。
+ *
+ * 牌堆不需要另外畫：攤開前每張卡只轉到最終角度的 --cp-deck-fan 倍，它們疊在
+ * 正中央、只露出一點點邊——那一疊就是牌堆本身。
+ */
+@keyframes cp-deal-stack {
+  from {
+    transform: translateX(-50%) translateY(var(--cp-deal-from));
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes cp-deal-spread {
+  /* 起點是牌堆角度而不是 0——見上面 --cp-deck-fan 的說明。
+     這一格同時是攤開前的靜止狀態（animation-fill-mode: backwards）。 */
+  from {
+    transform: rotate(calc(var(--cp-angle) * var(--cp-deck-fan)));
+  }
+  /* 轉到一半時微微抬起，像用手指把牌從牌堆裡推出去再放下。 */
+  45% {
+    transform: rotate(calc(var(--cp-angle) * 0.45)) translateY(-6%);
+  }
+  to {
+    transform: rotate(var(--cp-angle)) translateY(0);
+  }
+}
+
+/*
+ * 切牌（位移）：上半疊被整個拿起來、移到旁邊停一下，再放回去。
+ *
+ * 只有上半疊真的動，下半疊只稍微讓開——不對稱是重點。兩疊同時等速對稱地跳開再
+ * 跳回，人眼讀不到重心也讀不到因果，會歸類成畫面閃爍而不是動作。
+ *
+ * 頭尾都是 transform: none，所以可以直接用 animation-iteration-count 重複，
+ * 每一輪都從牌堆狀態出發、回到牌堆狀態，不會愈切愈偏。
+ */
+@keyframes cp-deal-cut {
+  0% {
+    transform: none;
+  }
+  /* 拿起來、移開、停住。停這一下是給眼睛時間看清楚它離開了牌堆。 */
+  24%,
+  46% {
+    transform: translateX(calc(var(--cp-deal-shuffle-spread) * var(--cp-cut-x)))
+      translateY(calc(var(--cp-cut-top) * -24%)) rotate(calc(var(--cp-cut-top) * -7deg));
+  }
+  /* 回到中線但還浮著一點，最後一段是落下——像牌被放回桌面。 */
+  84% {
+    transform: translateY(calc(var(--cp-cut-top) * -4%));
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/*
+ * 切牌（換層）：這一段才是「看起來有被洗到」的來源。
+ *
+ * 卡片再怎麼位移，只要疊放順序沒變，看起來就只是一疊牌在抖——動得越多越像破圖。
+ * z-index 是整數屬性，可以直接用 keyframes 換；step-end 保證是「跳」不是漸變。
+ * 換層發生在 50%，那時上半疊還在旁邊、兩疊沒有重疊，所以換的當下看不出來，
+ * 看得出來的是它回來時變成**從下面**插進去。
+ *
+ * 結束後不留（沒有 forwards），回到 .cp-slot 自己的 z-index: var(--cp-z)。
+ * 後面的「依序攤開」需要層級嚴格依卡序，扇形才會一張整齊疊一張。
+ * 換回去的那一刻牌堆剛好合攏、每張完全重疊，看不出來。
+ */
+@keyframes cp-deal-restack {
+  0%,
+  49% {
+    z-index: var(--cp-z);
+  }
+  50%,
+  100% {
+    z-index: var(--cp-z-cut);
+  }
+}
+
+/* 牌還在飛的時候不接受點擊——動畫途中點下去，使用者以為自己選了看到的那張，
+   實際上選到的是它即將飛去的位置。pointer-events 是離散屬性，
+   用 keyframes 在結束那一刻才放行。 */
+@keyframes cp-deal-gate {
+  from,
+  99% {
+    pointer-events: none;
+  }
+  to {
+    pointer-events: auto;
+  }
+}
+
+.cp-fan[data-deal="true"] .cp-fan-stage {
+  animation: cp-deal-gate var(--cp-deal-total) step-end backwards;
+}
+
+/* 兩個 animation 共存：一個動 transform 與 opacity、一個動 z-index，互不干擾。
+   每個 longhand 的順序要跟 shorthand 裡的順序對齊。 */
+.cp-fan[data-deal="true"] .cp-slot {
+  animation:
+    cp-deal-stack var(--cp-deal-enter) ease-out backwards,
+    cp-deal-restack var(--cp-deal-shuffle-round) step-end backwards;
+  animation-delay: 0ms, calc(var(--cp-deal-enter) + var(--cp-deal-hold));
+  animation-iteration-count: 1, var(--cp-deal-rounds);
+}
+
+.cp-fan[data-deal="true"] .cp-card {
+  /* 單次時長 × 次數＝洗牌總時長；iteration-count 一定要寫在 shorthand 後面，
+     shorthand 會把它重設回 1。 */
+  animation: cp-deal-cut var(--cp-deal-shuffle-round) ease-in-out backwards;
+  animation-delay: calc(var(--cp-deal-enter) + var(--cp-deal-hold));
+  animation-iteration-count: var(--cp-deal-rounds);
+}
+
+.cp-fan[data-deal="true"] .cp-rotor {
+  animation: cp-deal-spread var(--cp-deal-spread) ease-out backwards;
+  animation-delay: calc(
+    var(--cp-deal-enter) + var(--cp-deal-hold) + var(--cp-deal-shuffle) + var(--cp-z) *
+      var(--cp-deal-stagger)
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-card,
+  .cp-slot {
+    transition: none;
+  }
+
+  /* 發牌整個跳過——但 gate 仍要跑完，否則卡片會停在不可點的狀態。 */
+  .cp-fan[data-deal="true"] .cp-slot,
+  .cp-fan[data-deal="true"] .cp-card,
+  .cp-fan[data-deal="true"] .cp-rotor {
+    animation: none;
+  }
+
+  .cp-fan[data-deal="true"] .cp-fan-stage {
+    animation-duration: 1ms;
+  }
+}
