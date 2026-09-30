@@ -7,9 +7,14 @@ export {
   MIDDLE_MCP,
   nextGrasp,
   palmSpan,
-  SCAN_DEFAULTS,
+  SCAN_STICKINESS,
+  stickyIndex,
+  initialRange,
+  MIN_SCAN_WIDTH,
   type ScanOptions,
+  type ScanRange,
   scanIndex,
+  widenRange,
   WRIST,
 } from "./landmarks";
 export {

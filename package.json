@@ -1,6 +1,6 @@
 {
   "name": "@puddingsenshi/card-picker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "扇形／線性排列的選卡互動元件。與任何牌組領域無關。",
   "keywords": [
     "react",
@@ -42,7 +42,8 @@
     "build": "tsup && cp src/fan-layout.css dist/fan-layout.css",
     "check-types": "tsc --noEmit",
     "test": "bun test",
-    "prepublishOnly": "bun run build"
+    "prepublishOnly": "bun run build",
+    "prepare": "bun run build"
   },
   "devDependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",

@@ -27,16 +27,25 @@ describe("fanStyle", () => {
       "--cp-arc",
       "--cp-card-h",
       "--cp-card-w",
+      "--cp-dim",
       "--cp-fan-h",
+      "--cp-headroom",
       "--cp-lift",
       "--cp-pivot",
+      "--cp-selected-lift",
     ]);
   });
 
   it("角度與樞紐直接反映參數", () => {
     const style = fanStyle({ arc: 20, pivot: 3 });
     expect(style["--cp-arc"]).toBe("20deg");
-    expect(style["--cp-pivot"]).toBe("300%");
+    // 樞紐換算成卡高的倍數，不是百分比——百分比會隨元素實際高度漂移。
+    expect(style["--cp-pivot"]).toBe("calc(var(--cp-card-h) * 3)");
+  });
+
+  it("樞紐不用百分比，卡面多一行字也不會讓旋轉中心跑掉", () => {
+    expect(fanStyle()["--cp-pivot"]).not.toInclude("%");
+    expect(fanStyle()["--cp-pivot"]).toInclude("var(--cp-card-h)");
   });
 
   it("卡寬夾在理想寬與容器寬之間，不會溢出容器", () => {
@@ -48,7 +57,42 @@ describe("fanStyle", () => {
   it("高度由卡寬推導，且含推出的餘裕", () => {
     const style = fanStyle();
     expect(style["--cp-fan-h"]).toInclude("var(--cp-card-w)");
-    expect(style["--cp-fan-h"]).toInclude("var(--cp-lift)");
+    expect(style["--cp-fan-h"]).toInclude("var(--cp-headroom)");
+  });
+
+  it("頂端餘裕取兩種位移的較大者——抽高調大也不會被裁掉", () => {
+    const style = fanStyle();
+    expect(style["--cp-headroom"]).toInclude("max(");
+    expect(style["--cp-headroom"]).toInclude("var(--cp-lift)");
+    expect(style["--cp-headroom"]).toInclude("var(--cp-selected-lift)");
+  });
+
+  it("選中的抽高與未選的淡化都可由呼叫端注入", () => {
+    const style = fanStyle({ selectedLift: "7rem", dimUnselected: 0.75 });
+    expect(style["--cp-selected-lift"]).toBe("7rem");
+    expect(style["--cp-dim"]).toBe("0.75");
+  });
+
+  it("預設選中停在滑過時的高度，也不淡化其他卡", () => {
+    const style = fanStyle();
+    // 選走一張就停在剛才被指到的位置，不再往上跑，也不把鄰卡壓暗。
+    expect(style["--cp-selected-lift"]).toBe("var(--cp-lift)");
+    expect(style["--cp-dim"]).toBe("1");
+  });
+
+  it("預設的頂端餘裕由 lift 決定，不因選取而變高", () => {
+    const style = fanStyle();
+    expect(style["--cp-headroom"]).toBe("max(var(--cp-lift), var(--cp-selected-lift))");
+  });
+
+  it("想要更突出時可以調大抽高，餘裕自動跟上", () => {
+    const style = fanStyle({ selectedLift: "6rem" });
+    expect(style["--cp-selected-lift"]).toBe("6rem");
+    expect(style["--cp-headroom"]).toInclude("var(--cp-selected-lift)");
+  });
+
+  it("dimUnselected 設成 1 等於關掉淡化", () => {
+    expect(fanStyle({ dimUnselected: 1 })["--cp-dim"]).toBe("1");
   });
 
   it("預設值與 MT-103 的原始外觀一致", () => {

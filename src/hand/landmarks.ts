@@ -97,30 +97,91 @@ export function nextGrasp(
   return ratio < thresholds.close;
 }
 
+/**
+ * 掃描範圍：手實際掃過的水平區間。
+ *
+ * 用觀測到的範圍而不是一個猜出來的常數，是因為「手能掃多寬」同時取決於
+ * 手臂長度、坐姿、離鏡頭多遠、鏡頭視野多廣——沒有一組固定值能涵蓋所有人。
+ * 讓使用者掃到哪就把邊界推到哪，頭尾那張自然永遠碰得到。
+ */
+export interface ScanRange {
+  low: number;
+  high: number;
+}
+
+/**
+ * 範圍的最小寬度。
+ *
+ * 剛開始沒有觀測值，範圍若從零寬起算，手稍微動一下就會掃過全部的卡。
+ * 先給一段合理的中央區間，再由實際動作往外撐開。
+ */
+export const MIN_SCAN_WIDTH = 0.34;
+
+export function initialRange(center = 0.5, width = MIN_SCAN_WIDTH): ScanRange {
+  return { low: center - width / 2, high: center + width / 2 };
+}
+
+/**
+ * 依觀測到的位置把範圍往外擴。
+ *
+ * **只擴不縮**：一輪選牌只有幾秒，範圍若會縮回去，使用者剛掃到的邊界
+ * 會在下一秒失效，映射就開始漂。回傳原物件表示沒有變化。
+ */
+export function widenRange(range: ScanRange, x: number): ScanRange {
+  if (x < range.low) return { low: x, high: range.high };
+  if (x > range.high) return { low: range.low, high: x };
+  return range;
+}
+
+/**
+ * 邊界黏著的寬度，單位是「幾格」。
+ *
+ * 0.25 表示手要越過分界線再走 25% 的格寬，目標才換到相鄰那張——換句話說，
+ * 離目前這張的中心超過 0.75 格才鬆手。
+ *
+ * 沒有它的話，手停在兩張卡的交界時，偵測本身的抖動（每幀幾個 pixel）就足以
+ * 讓 round() 在兩個索引之間來回，目標高速跳動、根本按不準。這跟握拳判定
+ * 用 close/open 兩個閾值是同一個理由，見 GRASP_DEFAULTS。
+ */
+export const SCAN_STICKINESS = 0.25;
+
+/**
+ * 帶遲滯的索引取整。
+ *
+ * `position` 是連續的格座標（0 = 第一張，count-1 = 最後一張）。
+ * 沒有前一個目標時直接四捨五入；有的話就黏住，除非離得夠遠。
+ *
+ * 越界後用 round 而不是 previous ± 1——手快速揮過去時位置可能一口氣跨好幾格，
+ * 一次只走一格會讓目標追不上手。
+ */
+export function stickyIndex(
+  previous: number | null,
+  position: number,
+  count: number,
+  stickiness: number = SCAN_STICKINESS,
+): number {
+  const clamped = Math.min(Math.max(position, 0), count - 1);
+  if (previous === null) return Math.round(clamped);
+
+  // previous 可能是上一輪留下的、count 已經變小——先夾回合法範圍。
+  const held = Math.min(Math.max(previous, 0), count - 1);
+  return Math.abs(clamped - held) <= 0.5 + stickiness ? held : Math.round(clamped);
+}
+
 export interface ScanOptions {
   /** 卡片總數。 */
   count: number;
-  /** 有效區間佔影像寬度的比例。人很難把手舉到視野邊緣，用滿寬會導致兩端選不到。 */
-  span?: number;
   /** 鏡像。使用者看到的是自己的鏡像，手往右移索引也要往右。 */
   mirror?: boolean;
+  /** 掃描範圍。由呼叫端持有並隨每一幀擴張。 */
+  range: ScanRange;
   /**
-   * 手掌尺寸的基準值。
-   *
-   * 手離鏡頭越遠，同樣幅度的手臂擺動在影像上移動得越少；用實際手掌尺寸與
-   * 這個基準的比例去縮放有效區間，坐近坐遠就不必重新校準。
+   * 上一幀的目標。給了才有邊界黏著——不給就是每幀各自四捨五入。
    */
-  referencePalm?: number;
+  previous?: number | null;
+  /** 覆寫黏著寬度。 */
+  stickiness?: number;
 }
-
-export const SCAN_DEFAULTS = {
-  span: 0.65,
-  mirror: true,
-  referencePalm: 0.12,
-  /** 依距離縮放後允許的區間範圍，避免極端值把映射壓成一個點或撐到滿寬。 */
-  minSpan: 0.3,
-  maxSpan: 0.95,
-} as const;
 
 /**
  * 手掌水平位置 → 卡片索引。
@@ -128,27 +189,20 @@ export const SCAN_DEFAULTS = {
  * 只用 x。扇形本來就是沿一條弧線排的一維序列，用二維游標去指等於白白
  * 承受 y 軸的抖動；降成一維之後，整個垂直方向的誤差直接消失。
  *
- * 超出區間時**夾在頭尾那張**而不是失去目標——後者會讓使用者以為系統當掉了。
+ * 超出範圍時夾在頭尾那張——但配合 `widenRange`，超出這件事本身就會把
+ * 邊界推出去，所以實際上很少走到夾住這條路。
  */
 export function scanIndex(hand: readonly Landmark[], options: ScanOptions): number | null {
-  const { count } = options;
+  const { count, range } = options;
   if (count <= 0) return null;
 
   const palm = at(hand, MIDDLE_MCP);
   if (palm === null) return null;
 
-  const span = options.span ?? SCAN_DEFAULTS.span;
-  const mirror = options.mirror ?? SCAN_DEFAULTS.mirror;
-  const reference = options.referencePalm ?? SCAN_DEFAULTS.referencePalm;
+  const x = (options.mirror ?? true) ? 1 - palm.x : palm.x;
+  const width = range.high - range.low;
+  if (width <= 0) return null;
 
-  const size = palmSpan(hand);
-  const scaled =
-    size === null || reference <= 0
-      ? span
-      : Math.min(Math.max((span * size) / reference, SCAN_DEFAULTS.minSpan), SCAN_DEFAULTS.maxSpan);
-
-  const x = mirror ? 1 - palm.x : palm.x;
-  const low = 0.5 - scaled / 2;
-  const t = Math.min(Math.max((x - low) / scaled, 0), 1);
-  return Math.round(t * (count - 1));
+  const t = Math.min(Math.max((x - range.low) / width, 0), 1);
+  return stickyIndex(options.previous ?? null, t * (count - 1), count, options.stickiness);
 }

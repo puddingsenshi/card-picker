@@ -19,6 +19,8 @@ bun add github:puddingsenshi/card-picker
 # 或 npm install github:puddingsenshi/card-picker
 ```
 
+`dist/` 不進版控，所以從 git 安裝時靠 `prepare` 在安裝端自己 build 一次。
+
 需要 React 18 以上。手勢功能另外需要 `@mediapipe/tasks-vision`，不裝也能用其餘功能。
 
 ## 三個入口
@@ -32,20 +34,66 @@ bun add github:puddingsenshi/card-picker
 
 ## 最小用法
 
+卡面**由呼叫端畫**。元件只決定「怎麼排、指到哪張、選了哪些」，不知道卡片長什麼樣。
+
 ```tsx
 import { FanLayout, useCardSelection } from '@puddingsenshi/card-picker';
 import '@puddingsenshi/card-picker/style.css';
 
-function Deck({ cards }) {
-  const selection = useCardSelection({ total: cards.length, pick: 3 });
+function Deck() {
+  const { picked, pick } = useCardSelection({
+    max: 3,
+    onComplete: () => console.log('選滿了'),
+  });
+
   return (
     <FanLayout
-      cards={cards.map((c, i) => ({ id: c.id, ...selection.stateOf(i) }))}
-      onPick={selection.pick}
+      count={13}
+      picked={picked}
+      onPick={pick}
+      renderCard={({ selected }) => (
+        <span className={selected ? 'my-card my-card--picked' : 'my-card'} />
+      )}
     />
   );
 }
 ```
+
+## 發牌動畫
+
+預設開啟，四段接成一條時間軸：
+
+```
+0 ──── enter ──── hold ──── shuffle ──── stagger + spread ──→ 可點
+       整疊浮現    停一拍     切牌         依序攤開
+```
+
+牌堆不另外畫——攤開前每張卡只轉到最終角度的 `deckFan` 倍，邊緣露出來就成了一疊。
+切牌期間 `z-index` 真的會換：上半疊被拿起來、移到旁邊，回來時從下面插進去。
+沒有這個換層，卡片再怎麼移動看起來都只是一疊牌在抖。
+
+節奏全部可注入，`deal={false}` 整個關掉：
+
+```tsx
+<FanLayout deal={{ shuffleRounds: 1, shuffleMs: 700 }} ... />
+```
+
+| 參數 | 預設 | 作用 |
+|---|---|---|
+| `enterMs` | 420 | 整疊浮現 |
+| `holdMs` | 200 | 牌堆停一拍 |
+| `shuffleMs` | 1400 | 切牌總時間，設 0 跳過 |
+| `shuffleRounds` | 2 | 切幾次 |
+| `spreadMs` / `staggerMs` | 460 / 45 | 每張攤開的時間與間隔 |
+| `deckFan` | 0.06 | 牌堆預攤開的比例 |
+
+## 版面幾何
+
+沒有任何量測出來的魔術數字——尺寸全部從卡寬與長寬比推導，用 CSS 的 `cos()` / `sin()`
+即時求值，所以卡寬隨容器變化時高度與角度會自己跟上，不需要 `ResizeObserver`。
+
+`geometry` 可注入：`arc`（張角）、`pivot`（旋轉中心）、`ratio`（長寬比）、
+`maxCardWidth`、`lift`（被指向時推出的距離）、`selectedLift`、`dimUnselected`。
 
 ## 為什麼把指標抽象出來
 
@@ -55,7 +103,7 @@ function Deck({ cards }) {
 
 ```bash
 bun install
-bun test          # 45 個測試
+bun test          # 90 個測試
 bun run check-types
 bun run build     # 產出 dist/
 ```
