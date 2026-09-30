@@ -110,6 +110,12 @@ bun run check-types
 bun run build     # 產出 dist/
 ```
 
+## 規格
+
+行為規格在 [`docs/spec/`](docs/spec/)——版面幾何、選取狀態機、發牌動畫、指標抽象層、
+手勢判定各有一份，用 SHALL / MUST NOT 陳述，每條需求底下是可驗證的情境。改行為時
+連規格一起改。
+
 ## 來源
 
 原本是 [mystic-tarot](https://github.com/puddingsenshi/mystic-tarot) 的 workspace package，抽出來獨立維護，commit 歷史一併保留。
