@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "paths": {
+      "@puddingsenshi/card-picker": ["../src/index.ts"],
+      "@puddingsenshi/card-picker/pointer": ["../src/pointer/index.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}
